@@ -1,0 +1,73 @@
+---
+- name: Create regular user
+  hosts: webservers
+  tasks:
+
+  - name: Create user (RHEL)
+    become: yes
+    user:
+      name: labuser
+      append: yes
+      groups: wheel
+      create_home: yes
+      shell: /bin/bash
+      password: "*"
+      expires: -1
+    when: ansible_distribution in ["Fedora", "Red Hat Enterprise Linux", "CentOS", "Rocky Linux"]
+
+  - name: Create user (Ubuntu/Debian)
+    become: yes
+    user:
+      name: labuser
+      append: yes
+      groups: sudo
+      create_home: yes
+      shell: /bin/bash
+      password: "*"
+      expires: -1
+    when: ansible_distribution in ["Ubuntu", "Debian"]
+  
+  - name: Makes "labuser" not need to type a password for sudo
+    become: yes
+    lineinfile:
+      path: /etc/sudoers
+      line: "%labuser ALL=(ALL) NOPASSWD: ALL"
+      state: present
+      validate: "visudo -cf %s"
+  
+  - name: Copies .ssh directory from remote root user into new labuser
+    become: yes
+    copy:
+      src: /root/.ssh
+      dest: /home/labuser
+      owner: labuser
+      group: labuser
+      mode: 0700
+      remote_src: yes
+  
+  - name: Disables root login
+    become: yes
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PermitRootLogin'
+      line: 'PermitRootLogin no'
+      state: present
+    notify:
+      - restart ssh
+      - restart sshd
+
+  handlers:
+    - name: restart sshd
+      become: yes
+      service:
+        name: sshd
+        state: restarted
+        enabled: yes
+      when: ansible_distribution in ["Fedora", "Red Hat Enterprise Linux", "CentOS", "Rocky Linux"]
+    - name: restart ssh
+      become: yes
+      service:
+        name: ssh
+        state: restarted
+        enabled: yes
+      when: ansible_distribution in ["Ubuntu", "Debian"]

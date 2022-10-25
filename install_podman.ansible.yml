@@ -1,0 +1,31 @@
+---
+- name: Install podman
+  hosts: webservers
+  become: true
+  tasks:
+  - name: Install podman (DNF)
+    become: true
+    dnf:
+      name:
+        - podman
+      state: latest
+    when: ansible_distribution in ["Fedora", "Red Hat Enterprise Linux", "CentOS"]
+
+  - name: Install podman (APT)
+    become: true
+    apt:
+      name:
+        - podman
+      state: latest
+    when: ansible_distribution in ["Ubuntu", "Debian"]
+  
+  - name: Pull http2:2-alpine image from Docker Hub
+    podman_image:
+      name: docker.io/library/httpd
+      tag: 2-alpine
+
+  - name: Runs alpine container
+    containers.podman.podman_container:
+      name: alpine-container
+      image: docker.io/library/httpd:2-alpine
+      state: started
